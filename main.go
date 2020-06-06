@@ -120,18 +120,20 @@ func renderIndex(w http.ResponseWriter, listFiles []string) {
 	contentTemplate := `
 	<!DOCTYPE html>
 	<html itemscope itemtype="http://schema.org/QAPage" class="html__responsive">
-	<head><meta name="viewport" content="width=device-width, height=device-height, initial-scale=1.0, minimum-scale=1.0">
+	<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, height=device-height, initial-scale=1.0, minimum-scale=1.0">
+	<style>.download { padding: 6px 20px;}</style>
 	</head>
 	<body>
 		<div>
-				<h4>List files:</h4>
-		<ul>
+		<h4>List files:</h4>
+		<table>
 			{{range $val := .}}
-			<li>
-				<a href="/{{$val}}">{{$val}}</a>
-			</li>
+			<tr>
+				<td><a href="/{{$val}}">{{$val}}</a><td>
+				<td class="download"><a href="/{{$val}}?download">Download</a></td>
+			</tr>
 			{{end}}
-		</ul>
+		</table>
 		</br>
 		</br>
 		<a href="/stop">Done</a>
@@ -154,7 +156,7 @@ func newDownloadHandler(listFiles []string) http.HandlerFunc {
 		parts := strings.Split(r.URL.Path, "/")
 		filename := parts[len(parts)-1]
 		if filePath, ok := m[filename]; ok {
-			if r.URL.Query().Get("download") != "" {
+			if _, forceDownload := r.URL.Query()["download"]; forceDownload {
 				w.Header().Set("Content-Disposition", "attachment; filename="+filename)
 				w.Header().Set("Content-Type", "application/octet-stream")
 			}
