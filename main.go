@@ -10,6 +10,7 @@ import (
 	"os/exec"
 	"os/signal"
 	"path"
+	"strconv"
 	"strings"
 	"syscall"
 	"time"
@@ -157,7 +158,7 @@ func newDownloadHandler(listFiles []string) http.HandlerFunc {
 		filename := parts[len(parts)-1]
 		if filePath, ok := m[filename]; ok {
 			if _, forceDownload := r.URL.Query()["download"]; forceDownload {
-				w.Header().Set("Content-Disposition", "attachment; filename="+filename)
+				w.Header().Set("Content-Disposition", "attachment; filename="+strconv.Quote(filename))
 				w.Header().Set("Content-Type", "application/octet-stream")
 			}
 			http.ServeFile(w, r, filePath)
