@@ -14,6 +14,8 @@ import (
 	"strings"
 	"syscall"
 	"time"
+
+	qrcode "github.com/skip2/go-qrcode"
 )
 
 func main() {
@@ -36,7 +38,7 @@ func serve(listFiles []string) {
 	port := 3360
 	local := false
 
-	listener, err := tryToListen(address, port)
+	listener, err := listen(address, port)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		return
@@ -56,6 +58,13 @@ func serve(listFiles []string) {
 			return
 		}
 		renderIndex(w, listFiles)
+	})
+
+	png, _ := qrcode.Encode(www, qrcode.Medium, 256)
+	http.HandleFunc("/qr", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(200)
+		w.Header().Set("content-type", "image/png")
+		w.Write(png)
 	})
 	http.HandleFunc("/stop", func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("Stopped server. Goodbye ;)"))
@@ -78,7 +87,7 @@ func serve(listFiles []string) {
 	}
 }
 
-func tryToListen(address string, port int) (net.Listener, error) {
+func listen(address string, port int) (net.Listener, error) {
 	addr := fmt.Sprintf("%s:%d", address, port)
 
 	if listener, err := net.Listen("tcp", addr); err == nil {
@@ -126,6 +135,8 @@ func renderIndex(w http.ResponseWriter, listFiles []string) {
 	</head>
 	<body>
 		<div>
+		<div>Address:</div>
+		<img src="/qr" width="200" />
 		<h4>List files:</h4>
 		<table>
 			{{range $val := .}}
