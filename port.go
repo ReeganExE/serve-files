@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"fmt"
 	"net"
 	"os"
@@ -49,7 +50,10 @@ func newForwarderListener(port int, nodePath string) (*ForwarderListener, error)
 }
 
 func forwardPort(nodePath, from, to string) *exec.Cmd {
-	cmd := exec.Command(nodePath, "-e", proxyjs, "..", from, to)
+	cmd := exec.Command(nodePath, "-", from, to)
+	buffer := &bytes.Buffer{}
+	buffer.WriteString(proxyjs)
+	cmd.Stdin = buffer
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	return cmd
