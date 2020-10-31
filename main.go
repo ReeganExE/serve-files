@@ -16,7 +16,7 @@ import (
 	"syscall"
 	"time"
 
-	qrcode "github.com/skip2/go-qrcode"
+	"github.com/skip2/go-qrcode"
 )
 
 var (
