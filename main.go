@@ -99,13 +99,13 @@ func serve(listFiles []string) {
 }
 
 func tryListen(port int) (*ForwarderListener, error) {
-	if listener, e := newForwarderListener(port, nodePath); e == nil {
+	if listener, e := ListenAndForward(port, nodePath); e == nil {
 		return listener, nil
 	}
 
 	tryStopPort(port)
 	time.Sleep(time.Second)
-	return newForwarderListener(port, nodePath)
+	return ListenAndForward(port, nodePath)
 }
 
 func tryStopPort(port int) {
