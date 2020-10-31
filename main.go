@@ -99,8 +99,7 @@ func serve(listFiles []string) {
 }
 
 func tryListen(port int) (*ForwarderListener, error) {
-	listener, e := newForwarderListener(port, nodePath)
-	if e == nil {
+	if listener, e := newForwarderListener(port, nodePath); e == nil {
 		return listener, nil
 	}
 

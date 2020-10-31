@@ -21,13 +21,13 @@ type ForwarderListener struct {
 
 func newForwarderListener(port int, nodePath string) (*ForwarderListener, error) {
 	internalAddr := fmt.Sprintf("localhost:%d", 0)
-	listener, e := net.Listen("tcp", internalAddr)
+	internalListener, e := net.Listen("tcp", internalAddr)
 
 	if e != nil {
 		return nil, e
 	}
 
-	internalTCPAddr := listener.Addr().(*net.TCPAddr)
+	internalTCPAddr := internalListener.Addr().(*net.TCPAddr)
 	internalAddr = fmt.Sprintf("localhost:%d", internalTCPAddr.Port)
 	publicAddr := fmt.Sprintf("0.0.0.0:%d", port)
 
@@ -46,7 +46,7 @@ func newForwarderListener(port int, nodePath string) (*ForwarderListener, error)
 		return nil, e
 	}
 
-	return &ForwarderListener{Listener: listener, Close: cmd.Process.Kill, Addr: internalTCPAddr}, nil
+	return &ForwarderListener{Listener: internalListener, Close: cmd.Process.Kill, Addr: internalTCPAddr}, nil
 }
 
 func forwardPort(nodePath, from, to string) *exec.Cmd {
