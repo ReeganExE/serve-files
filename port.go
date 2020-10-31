@@ -5,19 +5,24 @@ import (
 	"net"
 	"os"
 	"os/exec"
+	"time"
+
+	"github.com/pkg/errors"
 )
 
 type ForwarderListener struct {
+	// Listener Internal listener
 	Listener net.Listener
-	Addr     *net.TCPAddr
-	Close    killer
+	// Addr internal litener addr
+	Addr  *net.TCPAddr
+	Close killer
 }
 
 type killer func() error
 
 func newForwarderListener(port int, nodePath string) (*ForwarderListener, error) {
 	internalAddr := fmt.Sprintf("localhost:%d", 0)
-	listener, e := net.Listen("", internalAddr)
+	listener, e := net.Listen("tcp", internalAddr)
 
 	if e != nil {
 		return nil, e
@@ -26,18 +31,30 @@ func newForwarderListener(port int, nodePath string) (*ForwarderListener, error)
 	tcpAddr := listener.Addr().(*net.TCPAddr)
 	internalAddr = fmt.Sprintf("localhost:%d", tcpAddr.Port)
 	publicAddr := fmt.Sprintf("0.0.0.0:%d", port)
-	kill, e := forwardPort(nodePath, publicAddr, internalAddr)
+
+	// Due to handle error from child process makes this complicated
+	// We will go with the solution to check the port before listening on it
+	timeout := time.Second
+	conn, _ := net.DialTimeout("tcp", publicAddr, timeout)
+	if conn != nil {
+		conn.Close()
+		return nil, errors.New("port in use")
+	}
+
+	cmd := forwardPort(nodePath, publicAddr, internalAddr)
+	e = cmd.Start()
 	if e != nil {
 		return nil, e
 	}
-	return &ForwarderListener{Listener: listener, Close: kill, Addr: tcpAddr}, nil
+
+	return &ForwarderListener{Listener: listener, Close: cmd.Process.Kill, Addr: tcpAddr}, nil
 }
 
-func forwardPort(nodePath, from, to string) (killer, error) {
+func forwardPort(nodePath, from, to string) *exec.Cmd {
 	cmd := exec.Command(nodePath, "-e", proxyjs, "..", from, to)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
-	return cmd.Process.Kill, cmd.Start()
+	return cmd
 }
 
 var proxyjs = `

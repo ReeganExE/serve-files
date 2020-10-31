@@ -34,33 +34,16 @@ func main() {
 }
 
 func serve(listFiles []string) {
-	var publicAddr = "localhost"
 	port := 3360
-	local := false
 
-	listener, err := listen("localhost", 0)
+	listener, err := tryListen(port)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		return
 	}
-	if !local {
-		// Get the outbound IP
-		publicAddr = getOutboundIP().String()
-	}
 
-	var kill killer
-
-	go func() {
-		internalAddr := fmt.Sprintf("localhost:%d", listener.Addr().(*net.TCPAddr).Port)
-		fmt.Println("http://" + internalAddr)
-		kill, err = forwardPort(
-			"/usr/local/bin/node",
-			fmt.Sprintf("0.0.0.0:%d", port),
-			internalAddr)
-		if err != nil {
-			log.Fatal(err)
-		}
-	}()
+	// Get the outbound IP
+	publicAddr := getOutboundIP().String()
 
 	www := fmt.Sprintf("http://%s:%d", publicAddr, port)
 	fmt.Printf("Listening on: %s\n", www)
@@ -85,7 +68,7 @@ func serve(listFiles []string) {
 		go func() {
 			// Wait for a second for the response to finish
 			time.Sleep(500 * time.Millisecond)
-			e := kill()
+			e := listener.Close()
 			if e != nil {
 				fmt.Println(e)
 			}
@@ -100,26 +83,26 @@ func serve(listFiles []string) {
 	}()
 
 	// start server
-	if err := http.Serve(listener, nil); err != nil {
+	if err := http.Serve(listener.Listener, nil); err != nil {
 		panic(err)
 	}
 }
 
-func listen(address string, port int) (net.Listener, error) {
-	addr := fmt.Sprintf("%s:%d", address, port)
-
-	if listener, err := net.Listen("tcp", addr); err == nil {
+func tryListen(port int) (*ForwarderListener, error) {
+	listener, e := newForwarderListener(port, "/usr/local/bin/node")
+	if e == nil {
 		return listener, nil
 	}
 
+	tryStopPort(port)
+	time.Sleep(time.Second)
+	return newForwarderListener(port, "/usr/local/bin/node")
+}
+
+func tryStopPort(port int)  {
 	fmt.Println("Address in use. Trying to stop the old server ...")
-	client := http.Client{Timeout: 20 * time.Second}
+	client := http.Client{Timeout: 1 * time.Second}
 	client.Get(fmt.Sprintf("http://localhost:%d/stop", port))
-
-	time.Sleep(1 * time.Second)
-
-	// Try to listen again
-	return net.Listen("tcp", addr)
 }
 
 var timer *time.Timer
