@@ -16,6 +16,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/reeganexe/go-portfwd"
 	"github.com/skip2/go-qrcode"
 )
 
@@ -98,14 +99,14 @@ func serve(listFiles []string) {
 	}
 }
 
-func tryListen(port int) (*ForwarderListener, error) {
-	if listener, e := ListenAndForward(port, nodePath); e == nil {
+func tryListen(port int) (*portfwd.ForwarderListener, error) {
+	if listener, e := portfwd.ListenAndForward(port, nodePath); e == nil {
 		return listener, nil
 	}
 
 	tryStopPort(port)
 	time.Sleep(time.Second)
-	return ListenAndForward(port, nodePath)
+	return portfwd.ListenAndForward(port, nodePath)
 }
 
 func tryStopPort(port int) {
