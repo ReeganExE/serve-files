@@ -1,6 +1,7 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"html/template"
 	"log"
@@ -18,8 +19,19 @@ import (
 	qrcode "github.com/skip2/go-qrcode"
 )
 
+var (
+	port     = 3360
+	nodePath = "/usr/local/bin/node"
+)
+
 func main() {
-	listFiles := os.Args[1:]
+	var nodePath = "node"
+	flag.IntVar(&port, "port", port, "Port")
+	flag.StringVar(&nodePath, "node", nodePath, "node path")
+	flag.Parse()
+
+	listFiles := flag.Args()
+
 	for _, v := range listFiles {
 		fmt.Printf("%s -> %s\n", v, path.Base(v))
 	}
@@ -34,8 +46,6 @@ func main() {
 }
 
 func serve(listFiles []string) {
-	port := 3360
-
 	listener, err := tryListen(port)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
@@ -89,17 +99,17 @@ func serve(listFiles []string) {
 }
 
 func tryListen(port int) (*ForwarderListener, error) {
-	listener, e := newForwarderListener(port, "/usr/local/bin/node")
+	listener, e := newForwarderListener(port, nodePath)
 	if e == nil {
 		return listener, nil
 	}
 
 	tryStopPort(port)
 	time.Sleep(time.Second)
-	return newForwarderListener(port, "/usr/local/bin/node")
+	return newForwarderListener(port, nodePath)
 }
 
-func tryStopPort(port int)  {
+func tryStopPort(port int) {
 	fmt.Println("Address in use. Trying to stop the old server ...")
 	client := http.Client{Timeout: 1 * time.Second}
 	client.Get(fmt.Sprintf("http://localhost:%d/stop", port))

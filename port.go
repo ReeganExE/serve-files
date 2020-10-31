@@ -14,7 +14,7 @@ import (
 type ForwarderListener struct {
 	// Listener Internal listener
 	Listener net.Listener
-	// Addr internal litener addr
+	// Addr internal listener addr
 	Addr  *net.TCPAddr
 	Close func() error
 }
