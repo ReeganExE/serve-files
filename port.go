@@ -7,7 +7,7 @@ import (
 	"os/exec"
 	"time"
 
-	"github.com/pkg/errors"
+	"errors"
 )
 
 type ForwarderListener struct {
@@ -15,10 +15,8 @@ type ForwarderListener struct {
 	Listener net.Listener
 	// Addr internal litener addr
 	Addr  *net.TCPAddr
-	Close killer
+	Close func() error
 }
-
-type killer func() error
 
 func newForwarderListener(port int, nodePath string) (*ForwarderListener, error) {
 	internalAddr := fmt.Sprintf("localhost:%d", 0)
@@ -28,8 +26,8 @@ func newForwarderListener(port int, nodePath string) (*ForwarderListener, error)
 		return nil, e
 	}
 
-	tcpAddr := listener.Addr().(*net.TCPAddr)
-	internalAddr = fmt.Sprintf("localhost:%d", tcpAddr.Port)
+	internalTCPAddr := listener.Addr().(*net.TCPAddr)
+	internalAddr = fmt.Sprintf("localhost:%d", internalTCPAddr.Port)
 	publicAddr := fmt.Sprintf("0.0.0.0:%d", port)
 
 	// Due to handle error from child process makes this complicated
@@ -47,7 +45,7 @@ func newForwarderListener(port int, nodePath string) (*ForwarderListener, error)
 		return nil, e
 	}
 
-	return &ForwarderListener{Listener: listener, Close: cmd.Process.Kill, Addr: tcpAddr}, nil
+	return &ForwarderListener{Listener: listener, Close: cmd.Process.Kill, Addr: internalTCPAddr}, nil
 }
 
 func forwardPort(nodePath, from, to string) *exec.Cmd {
