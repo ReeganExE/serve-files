@@ -34,21 +34,35 @@ func main() {
 }
 
 func serve(listFiles []string) {
-	var address = ""
+	var publicAddr = "localhost"
 	port := 3360
 	local := false
 
-	listener, err := listen(address, port)
+	listener, err := listen("localhost", 0)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		return
 	}
 	if !local {
 		// Get the outbound IP
-		address = getOutboundIP().String()
+		publicAddr = getOutboundIP().String()
 	}
 
-	www := fmt.Sprintf("http://%s:%d", address, listener.Addr().(*net.TCPAddr).Port)
+	var kill killer
+
+	go func() {
+		internalAddr := fmt.Sprintf("localhost:%d", listener.Addr().(*net.TCPAddr).Port)
+		fmt.Println("http://" + internalAddr)
+		kill, err = forwardPort(
+			"/usr/local/bin/node",
+			fmt.Sprintf("0.0.0.0:%d", port),
+			internalAddr)
+		if err != nil {
+			log.Fatal(err)
+		}
+	}()
+
+	www := fmt.Sprintf("http://%s:%d", publicAddr, port)
 	fmt.Printf("Listening on: %s\n", www)
 
 	dlHandler := newDownloadHandler(listFiles)
@@ -71,6 +85,10 @@ func serve(listFiles []string) {
 		go func() {
 			// Wait for a second for the response to finish
 			time.Sleep(500 * time.Millisecond)
+			e := kill()
+			if e != nil {
+				fmt.Println(e)
+			}
 			os.Exit(0)
 		}()
 	})
