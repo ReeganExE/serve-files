@@ -25,6 +25,8 @@ var (
 	nodePath = "/usr/local/bin/node"
 )
 
+var stopServer func()
+
 func main() {
 	var nodePath = "node"
 	flag.IntVar(&port, "port", port, "Port")
@@ -53,6 +55,11 @@ func serve(listFiles []string) {
 		return
 	}
 
+	stopServer = func() {
+		listener.Close()
+		os.Exit(0)
+	}
+
 	// Get the outbound IP
 	publicAddr := getOutboundIP().String()
 
@@ -78,12 +85,7 @@ func serve(listFiles []string) {
 		w.Write([]byte("Stopped server. Goodbye ;)"))
 		go func() {
 			// Wait for a second for the response to finish
-			time.Sleep(500 * time.Millisecond)
-			e := listener.Close()
-			if e != nil {
-				fmt.Println(e)
-			}
-			os.Exit(0)
+			time.AfterFunc(500*time.Millisecond, stopServer)
 		}()
 	})
 
@@ -154,6 +156,7 @@ func renderIndex(w http.ResponseWriter, listFiles []string) {
 			<tr>
 				<td><a href="/{{$val}}">{{$val}}</a><td>
 				<td class="download"><a href="/{{$val}}?download">Download</a></td>
+				<td class="download"><a href="/{{$val}}?download&stop">Download & Stop</a></td>
 			</tr>
 			{{end}}
 		</table>
@@ -183,7 +186,13 @@ func newDownloadHandler(listFiles []string) http.HandlerFunc {
 				w.Header().Set("Content-Disposition", "attachment; filename="+strconv.Quote(filename))
 				w.Header().Set("Content-Type", "application/octet-stream")
 			}
+
 			http.ServeFile(w, r, filePath)
+			if _, stop := r.URL.Query()["stop"]; stop {
+				go func() {
+					time.AfterFunc(time.Second, stopServer)
+				}()
+			}
 		} else {
 			http.NotFound(w, r)
 		}
