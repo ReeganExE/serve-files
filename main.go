@@ -18,6 +18,7 @@ import (
 
 	"github.com/reeganexe/go-portfwd"
 	"github.com/skip2/go-qrcode"
+	"github.com/valyala/fasthttp"
 )
 
 var (
@@ -67,27 +68,25 @@ func serve(listFiles []string) {
 	fmt.Printf("Listening on: %s\n", www)
 
 	dlHandler := newDownloadHandler(listFiles)
-	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/" {
-			dlHandler(w, r)
-			return
-		}
-		renderIndex(w, listFiles)
-	})
 
 	png, _ := qrcode.Encode(www, qrcode.Medium, 256)
-	http.HandleFunc("/qr", func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(200)
-		w.Header().Set("content-type", "image/png")
-		w.Write(png)
-	})
-	http.HandleFunc("/stop", func(w http.ResponseWriter, r *http.Request) {
-		w.Write([]byte("Stopped server. Goodbye ;)"))
-		go func() {
-			// Wait for a second for the response to finish
-			time.AfterFunc(500*time.Millisecond, stopServer)
-		}()
-	})
+	m := func(ctx *fasthttp.RequestCtx) {
+		switch string(ctx.Path()) {
+		case "/qr":
+			ctx.Response.Header.SetContentType("image/png")
+			ctx.Write(png)
+		case "/stop":
+			ctx.Write([]byte("Stopped server. Goodbye ;)"))
+			go func() {
+				// Wait for a second for the response to finish
+				time.AfterFunc(500*time.Millisecond, stopServer)
+			}()
+		case "/":
+			renderIndex(ctx, listFiles)
+		default:
+			dlHandler(ctx)
+		}
+	}
 
 	// Open web browser
 	go func() {
@@ -96,7 +95,7 @@ func serve(listFiles []string) {
 	}()
 
 	// start server
-	if err := http.Serve(listener.Listener, nil); err != nil {
+	if err := fasthttp.Serve(listener.Listener, m); err != nil {
 		panic(err)
 	}
 }
@@ -119,9 +118,9 @@ func tryStopPort(port int) {
 
 var timer *time.Timer
 
-func renderIndex(w http.ResponseWriter, listFiles []string) {
+func renderIndex(ctx *fasthttp.RequestCtx, listFiles []string) {
 	if len(listFiles) == 0 {
-		w.Write([]byte("No file to serve. The server will stop in next 5 seconds"))
+		ctx.Write([]byte("No file to serve. The server will stop in next 5 seconds"))
 
 		if timer == nil {
 			timer = time.NewTimer(5 * time.Second)
@@ -133,7 +132,7 @@ func renderIndex(w http.ResponseWriter, listFiles []string) {
 		return
 	}
 
-	w.Header().Set("content-type", "text/html")
+	ctx.Response.Header.SetContentType("text/html")
 
 	fileNames := make([]string, len(listFiles))
 	for k, v := range listFiles {
@@ -169,32 +168,32 @@ func renderIndex(w http.ResponseWriter, listFiles []string) {
 
 	t := template.Must(template.New("tmpl").Parse(contentTemplate))
 
-	t.Execute(w, fileNames)
+	t.Execute(ctx.Response.BodyWriter(), fileNames)
 }
 
-func newDownloadHandler(listFiles []string) http.HandlerFunc {
+func newDownloadHandler(listFiles []string) fasthttp.RequestHandler {
 	m := make(map[string]string, len(listFiles))
 
 	for _, fn := range listFiles {
 		m[path.Base(fn)] = fn
 	}
-	return func(w http.ResponseWriter, r *http.Request) {
-		parts := strings.Split(r.URL.Path, "/")
+	return func(ctx *fasthttp.RequestCtx) {
+		parts := strings.Split(string(ctx.Path()), "/")
 		filename := parts[len(parts)-1]
 		if filePath, ok := m[filename]; ok {
-			if _, forceDownload := r.URL.Query()["download"]; forceDownload {
-				w.Header().Set("Content-Disposition", "attachment; filename="+strconv.Quote(filename))
-				w.Header().Set("Content-Type", "application/octet-stream")
+			if ctx.URI().QueryArgs().Has("download") {
+				ctx.Response.Header.Set("Content-Disposition", "attachment; filename="+strconv.Quote(filename))
+				ctx.Response.Header.SetContentType("application/octet-stream")
 			}
 
-			http.ServeFile(w, r, filePath)
-			if _, stop := r.URL.Query()["stop"]; stop {
+			fasthttp.ServeFile(ctx, filePath)
+			if ctx.URI().QueryArgs().Has("stop") {
 				go func() {
 					time.AfterFunc(time.Second, stopServer)
 				}()
 			}
 		} else {
-			http.NotFound(w, r)
+			ctx.NotFound()
 		}
 	}
 }
