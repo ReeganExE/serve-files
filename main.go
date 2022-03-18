@@ -29,7 +29,7 @@ var (
 var stopServer func()
 
 func main() {
-	var nodePath = "node"
+	nodePath = "node"
 	flag.IntVar(&port, "port", port, "Port")
 	flag.StringVar(&nodePath, "node", nodePath, "node path")
 	flag.Parse()
