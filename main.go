@@ -44,7 +44,7 @@ func main() {
 	signal.Notify(exit, syscall.SIGINT, syscall.SIGTERM)
 	go func() {
 		<-exit
-		os.Exit(0)
+		stopServer()
 	}()
 	serve(listFiles)
 }
@@ -58,7 +58,9 @@ func serve(listFiles []string) {
 
 	stopServer = func() {
 		listener.Close()
-		os.Exit(0)
+		time.AfterFunc(time.Millisecond*500, func() {
+			os.Exit(0)
+		})
 	}
 
 	// Get the outbound IP
@@ -101,10 +103,12 @@ func serve(listFiles []string) {
 }
 
 func tryListen(port int) (*portfwd.ForwarderListener, error) {
-	if listener, e := portfwd.ListenAndForward(port, nodePath); e == nil {
+	listener, e := portfwd.ListenAndForward(port, nodePath)
+	if e == nil {
 		return listener, nil
 	}
 
+	fmt.Println(e)
 	tryStopPort(port)
 	time.Sleep(time.Second)
 	return portfwd.ListenAndForward(port, nodePath)
